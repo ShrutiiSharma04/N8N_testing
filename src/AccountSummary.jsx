@@ -17,4 +17,4 @@ function AccountSummary() {
   );
 }
 
-export default AccountSummary;
+export default AccountSummary
