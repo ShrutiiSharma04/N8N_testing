@@ -1,20 +1,15 @@
-import { createSignal } from 'solid-js';
-
-interface BudgetPlannerProps {
-  initialBudget?: number;
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "types": ["vite/client"],
+    "noEmit": true,
+    "isolatedModules": true
+  }
 }
-
-function BudgetPlanner(props: BudgetPlannerProps) {
-  const [budget, setBudget] = createSignal(props.initialBudget || 20000);
-  const [expenses, setExpenses] = createSignal([]);
-  const [expenseName, setExpenseName] = createSignal("");
-
-  return (
-    <div>
-      <h2>Budget Planner</h2>
-      <div>Budget: ${budget()}</div>
-    </div>
-  );
-}
-
-export default BudgetPlanner;
