@@ -1,0 +1,55 @@
+name: PR Coverage Check
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npx vitest run --coverage
+
+      - name: Extract coverage and prepare data
+        id: coverage
+        run: |
+          COVERAGE_JSON="coverage/coverage-final.json"
+          TOTAL_COVERED=$(jq '.total.lines.pct' $COVERAGE_JSON)
+          echo "COVERAGE=$TOTAL_COVERED" >> $GITHUB_ENV
+
+          # Identify under-covered files (<80%)
+          UNDER_TESTED=$(jq 'to_entries | map(select(.value.lines.pct < 80)) | from_entries' $COVERAGE_JSON)
+          echo "UNDER_TESTED=$(echo "$UNDER_TESTED" | jq -c)" >> $GITHUB_ENV
+
+          # Set flag for coverage >= 80 using bc for float comparison
+          if (( $(echo "$TOTAL_COVERED >= 80" | bc -l) )); then
+            echo "COVERAGE_OK=true" >> $GITHUB_ENV
+          else
+            echo "COVERAGE_OK=false" >> $GITHUB_ENV
+          fi
+
+      - name: Post to n8n
+        run: |
+          curl -X POST https://shrutisharma40.app.n8n.cloud/webhook/vitest-coverage \
+          -H "Content-Type: application/json" \
+          -d '{
+            "pr_number": "'"${{ github.event.pull_request.number }}"'",
+            "sha": "'"${{ github.sha }}"'",
+            "coverage_ok": '"${{ env.COVERAGE_OK }}"',
+            "under_tested": ${{ toJson(env.UNDER_TESTED) }}
+
+          }'
+
