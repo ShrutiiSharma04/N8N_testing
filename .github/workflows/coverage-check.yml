@@ -28,9 +28,9 @@ jobs:
         run: |
           COVERAGE_JSON="coverage/coverage-final.json"
 
-          # Calculate total coverage
-          COVERED=$(jq '[.[] | .lines.covered] | add' "$COVERAGE_JSON")
-          TOTAL=$(jq '[.[] | .lines.total] | add' "$COVERAGE_JSON")
+          # Calculate statement coverage from .s blocks
+          COVERED=$(jq '[.[] | .s | to_entries[] | select(.value > 0)] | length' "$COVERAGE_JSON")
+          TOTAL=$(jq '[.[] | .s | to_entries[]] | length' "$COVERAGE_JSON")
 
           if [ "$TOTAL" -gt 0 ]; then
             COVERAGE=$(echo "scale=2; $COVERED / $TOTAL * 100" | bc)
@@ -40,8 +40,8 @@ jobs:
 
           echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
 
-          # Store under-covered files
-          jq 'to_entries | map(select(.value.lines.pct < 80)) | from_entries' "$COVERAGE_JSON" > under_tested.json
+          # Store under-tested files
+          jq 'to_entries | map(select(.value.s != null and ([.value.s[]] | any(. == 0)))) | from_entries' "$COVERAGE_JSON" > under_tested.json
 
           if (( $(echo "$COVERAGE >= 80" | bc -l) )); then
             echo "COVERAGE_OK=true" >> $GITHUB_ENV
@@ -73,8 +73,12 @@ jobs:
               --argjson under_tested "$UNDER_TESTED" \
               '{pr_number: $pr_number, sha: $sha, coverage: $coverage, coverage_ok: ($coverage_ok == "true"), under_tested: $under_tested}')"
 
+      - name: Debug Coverage Output
+        run: echo "🔍 Total coverage: $COVERAGE%"
+
       - name: Fail if coverage < 80%
         if: env.COVERAGE_OK != 'true'
         run: |
           echo "❌ Test coverage is below 80%. Current: $COVERAGE%"
           exit 1
+
