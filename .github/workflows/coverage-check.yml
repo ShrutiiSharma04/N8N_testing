@@ -27,7 +27,7 @@ jobs:
         id: extract
         run: |
           COVERAGE_JSON="coverage/coverage-final.json"
-
+          
           TOTAL_COVERED=$(jq '.total.lines.pct' "$COVERAGE_JSON")
           echo "Total coverage: $TOTAL_COVERED"
 
@@ -45,9 +45,13 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           SHA: ${{ github.sha }}
+          COVERAGE: ${{ env.COVERAGE }}
           COVERAGE_OK: ${{ env.COVERAGE_OK }}
         run: |
+          echo "Posting to n8n..."
           UNDER_TESTED=$(cat under_tested.json)
+
+          echo "UNDER_TESTED JSON: $UNDER_TESTED"
 
           curl -X POST https://shrutisharma40.app.n8n.cloud/webhook/vitest-coverage \
             -H "Content-Type: application/json" \
