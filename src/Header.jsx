@@ -1,6 +1,6 @@
 const Header = () => {
   return (
-    <h1>Welcome to Our Company!!</h1>
+    <h1 class="company-header">Welcome to Our Company!!</h1>
   );
 };
 
