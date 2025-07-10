@@ -5,10 +5,9 @@ import { onMount } from 'solid-js';
 
 describe('Header', () => {
   it('renders the welcome message', () => {
-    onMount(() => {
+   
       render(() => <Header />);
       expect(screen.getByRole('heading', { name: 'Welcome to Our Company' })).toBeInTheDocument();
     });
   
-  });
 });
