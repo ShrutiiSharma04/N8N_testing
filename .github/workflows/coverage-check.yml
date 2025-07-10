@@ -32,14 +32,12 @@ jobs:
           TOTAL_COVERED=$(jq '.total.lines.pct' "$COVERAGE_JSON")
           echo "Total coverage: $TOTAL_COVERED"
 
-          # Save total coverage to env
           echo "COVERAGE=$TOTAL_COVERED" >> $GITHUB_ENV
 
-          # Extract under-covered files (< 80%)
-          UNDER_TESTED=$(jq 'to_entries | map(select(.value.lines.pct < 80)) | from_entries' "$COVERAGE_JSON")
-          echo "UNDER_TESTED=$UNDER_TESTED" >> $GITHUB_ENV
+          # Identify under-covered files (<80%)
+          jq 'to_entries | map(select(.value.lines.pct < 80)) | from_entries' "$COVERAGE_JSON" > under_tested.json
 
-          # Flag if coverage passes threshold
+          # Set coverage flag
           if (( $(echo "$TOTAL_COVERED >= 80" | bc -l) )); then
             echo "COVERAGE_OK=true" >> $GITHUB_ENV
           else
@@ -51,8 +49,9 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           SHA: ${{ github.sha }}
           COVERAGE_OK: ${{ env.COVERAGE_OK }}
-          UNDER_TESTED: ${{ env.UNDER_TESTED }}
         run: |
+          UNDER_TESTED=$(cat under_tested.json)
+
           curl -X POST https://shrutisharma40.app.n8n.cloud/webhook/vitest-coverage \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
