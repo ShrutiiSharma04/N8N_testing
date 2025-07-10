@@ -29,35 +29,35 @@ jobs:
           COVERAGE_JSON="coverage/coverage-final.json"
 
           # Get total line coverage
-          TOTAL_COVERED=$(jq '.total.lines.pct' $COVERAGE_JSON)
-          echo "coverage=$TOTAL_COVERED" >> $GITHUB_OUTPUT
+          TOTAL_COVERED=$(jq '.total.lines.pct' "$COVERAGE_JSON")
+          echo "Total coverage: $TOTAL_COVERED"
 
-          # Collect under-covered files < 80%
-          UNDER_TESTED=$(jq -c '
-            to_entries
-            | map(select(.value.lines.pct < 80))
-            | map({
-                key: (.key | gsub("\\\\"; "/") | gsub("^[A-Za-z]:/+"; "")),
-                value: .value
-              })
-            | from_entries
-          ' $COVERAGE_JSON)
-          echo "under_tested=$UNDER_TESTED" >> $GITHUB_OUTPUT
+          # Save total coverage to env
+          echo "COVERAGE=$TOTAL_COVERED" >> $GITHUB_ENV
 
-          # Coverage OK flag
+          # Extract under-covered files (< 80%)
+          UNDER_TESTED=$(jq 'to_entries | map(select(.value.lines.pct < 80)) | from_entries' "$COVERAGE_JSON")
+          echo "UNDER_TESTED=$UNDER_TESTED" >> $GITHUB_ENV
+
+          # Flag if coverage passes threshold
           if (( $(echo "$TOTAL_COVERED >= 80" | bc -l) )); then
-            echo "coverage_ok=true" >> $GITHUB_OUTPUT
+            echo "COVERAGE_OK=true" >> $GITHUB_ENV
           else
-            echo "coverage_ok=false" >> $GITHUB_OUTPUT
+            echo "COVERAGE_OK=false" >> $GITHUB_ENV
           fi
 
       - name: Post to n8n
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.sha }}
+          COVERAGE_OK: ${{ env.COVERAGE_OK }}
+          UNDER_TESTED: ${{ env.UNDER_TESTED }}
         run: |
           curl -X POST https://shrutisharma40.app.n8n.cloud/webhook/vitest-coverage \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
-              --argjson pr_number "${{ github.event.pull_request.number }}" \
-              --arg sha "${{ github.sha }}" \
-              --arg coverage_ok "${{ steps.extract.outputs.coverage_ok }}" \
-              --argjson under_tested "${{ steps.extract.outputs.under_tested }}" \
-              '{pr_number: $pr_number, sha: $sha, coverage_ok: ($coverage_ok == "true"), under_tested: $under_tested}')"
+              --arg pr_number "$PR_NUMBER" \
+              --arg sha "$SHA" \
+              --arg coverage_ok "$COVERAGE_OK" \
+              --argjson under_tested "$UNDER_TESTED" \
+              '{pr_number: ($pr_number | tonumber), sha: $sha, coverage_ok: ($coverage_ok == "true"), under_tested: $under_tested}')"
