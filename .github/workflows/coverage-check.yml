@@ -28,44 +28,53 @@ jobs:
         run: |
           COVERAGE_JSON="coverage/coverage-final.json"
 
-          # Dynamically compute total % coverage
-          TOTAL_COVERED=$(jq '[.[] | .lines.covered] | add as $c | [.[] | .lines.total] | add as $t | ($c / $t * 100)' "$COVERAGE_JSON")
-          echo "Total coverage: $TOTAL_COVERED"
+          # Calculate total coverage
+          COVERED=$(jq '[.[] | .lines.covered] | add' "$COVERAGE_JSON")
+          TOTAL=$(jq '[.[] | .lines.total] | add' "$COVERAGE_JSON")
 
-          echo "COVERAGE=$TOTAL_COVERED" >> $GITHUB_ENV
+          if [ "$TOTAL" -gt 0 ]; then
+            COVERAGE=$(echo "scale=2; $COVERED / $TOTAL * 100" | bc)
+          else
+            COVERAGE="0.00"
+          fi
 
-          # Store under-tested file list
+          echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
+
+          # Store under-covered files
           jq 'to_entries | map(select(.value.lines.pct < 80)) | from_entries' "$COVERAGE_JSON" > under_tested.json
 
-          if (( $(echo "$TOTAL_COVERED >= 80" | bc -l) )); then
+          if (( $(echo "$COVERAGE >= 80" | bc -l) )); then
             echo "COVERAGE_OK=true" >> $GITHUB_ENV
           else
             echo "COVERAGE_OK=false" >> $GITHUB_ENV
           fi
 
-      - name: Post to n8n (even if failing)
+      - name: Load ENV vars for curl step
+        run: |
+          echo "COVERAGE=$COVERAGE" >> $GITHUB_OUTPUT
+          echo "COVERAGE_OK=$COVERAGE_OK" >> $GITHUB_OUTPUT
+        id: vars
+
+      - name: Post to n8n (always runs)
         if: always()
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           SHA: ${{ github.sha }}
-          COVERAGE: ${{ env.COVERAGE }}
-          COVERAGE_OK: ${{ env.COVERAGE_OK }}
         run: |
-          echo "Posting to n8n..."
           UNDER_TESTED=$(cat under_tested.json)
 
           curl -X POST https://shrutisharma40.app.n8n.cloud/webhook/vitest-coverage \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
-              --arg pr_number "$PR_NUMBER" \
-              --arg sha "$SHA" \
-              --arg coverage_ok "$COVERAGE_OK" \
+              --argjson pr_number "${{ env.PR_NUMBER }}" \
+              --arg sha "${{ env.SHA }}" \
+              --arg coverage "${{ steps.extract.outputs.COVERAGE }}" \
+              --arg coverage_ok "${{ steps.extract.outputs.COVERAGE_OK }}" \
               --argjson under_tested "$UNDER_TESTED" \
-              '{pr_number: ($pr_number | tonumber), sha: $sha, coverage_ok: ($coverage_ok == "true"), under_tested: $under_tested}')"
+              '{pr_number: $pr_number, sha: $sha, coverage: $coverage, coverage_ok: ($coverage_ok == "true"), under_tested: $under_tested}')"
 
       - name: Fail if coverage < 80%
         if: env.COVERAGE_OK != 'true'
         run: |
           echo "❌ Test coverage is below 80%. Current: $COVERAGE%"
           exit 1
-
