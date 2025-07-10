@@ -63,7 +63,7 @@ jobs:
         run: |
           UNDER_TESTED=$(cat under_tested.json)
 
-          curl -X POST https://shrutisharma40.app.n8n.cloud/webhook/vitest-coverage \
+          curl -X POST https://shrutisharma404.app.n8n.cloud/webhook/vitest-coverage \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
               --argjson pr_number "${{ env.PR_NUMBER }}" \
