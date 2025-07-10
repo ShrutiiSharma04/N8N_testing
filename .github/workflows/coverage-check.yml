@@ -28,22 +28,17 @@ jobs:
         run: |
           COVERAGE_JSON="coverage/coverage-final.json"
 
-          # Get total line coverage as float
           TOTAL_COVERED=$(jq '.total.lines.pct' $COVERAGE_JSON)
           echo "Total coverage: $TOTAL_COVERED"
+          echo "coverage=$TOTAL_COVERED" >> $GITHUB_OUTPUT
 
-          # Store coverage %
-          echo "COVERAGE=$TOTAL_COVERED" >> $GITHUB_ENV
+          UNDER_TESTED=$(jq -c 'to_entries | map(select(.value.lines.pct < 80)) | from_entries' $COVERAGE_JSON)
+          echo "under_tested=$UNDER_TESTED" >> $GITHUB_OUTPUT
 
-          # Identify under-covered files (<80%)
-          UNDER_TESTED=$(jq 'to_entries | map(select(.value.lines.pct < 80)) | from_entries' $COVERAGE_JSON)
-          echo "UNDER_TESTED=$UNDER_TESTED" >> $GITHUB_ENV
-
-          # Set flag for 80%+ line coverage
           if (( $(echo "$TOTAL_COVERED >= 80" | bc -l) )); then
-            echo "COVERAGE_OK=true" >> $GITHUB_ENV
+            echo "coverage_ok=true" >> $GITHUB_OUTPUT
           else
-            echo "COVERAGE_OK=false" >> $GITHUB_ENV
+            echo "coverage_ok=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Post to n8n
@@ -53,7 +48,6 @@ jobs:
           -d "$(jq -n \
             --argjson pr_number "${{ github.event.pull_request.number }}" \
             --arg sha "${{ github.sha }}" \
-            --arg coverage_ok "$COVERAGE_OK" \
-            --argjson under_tested "$UNDER_TESTED" \
+            --arg coverage_ok "${{ steps.extract.outputs.coverage_ok }}" \
+            --argjson under_tested "${{ steps.extract.outputs.under_tested }}" \
             '{pr_number: $pr_number, sha: $sha, coverage_ok: ($coverage_ok == "true"), under_tested: $under_tested}')"
-
