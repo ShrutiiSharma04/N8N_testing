@@ -24,17 +24,22 @@ jobs:
         run: npx vitest run --coverage
 
       - name: Extract coverage and prepare data
-        id: coverage
+        id: extract
         run: |
           COVERAGE_JSON="coverage/coverage-final.json"
+
+          # Get total line coverage as float
           TOTAL_COVERED=$(jq '.total.lines.pct' $COVERAGE_JSON)
+          echo "Total coverage: $TOTAL_COVERED"
+
+          # Store coverage %
           echo "COVERAGE=$TOTAL_COVERED" >> $GITHUB_ENV
 
           # Identify under-covered files (<80%)
           UNDER_TESTED=$(jq 'to_entries | map(select(.value.lines.pct < 80)) | from_entries' $COVERAGE_JSON)
-          echo "UNDER_TESTED=$(echo "$UNDER_TESTED" | jq -c)" >> $GITHUB_ENV
+          echo "UNDER_TESTED=$UNDER_TESTED" >> $GITHUB_ENV
 
-          # Set flag for coverage >= 80 using bc for float comparison
+          # Set flag for 80%+ line coverage
           if (( $(echo "$TOTAL_COVERED >= 80" | bc -l) )); then
             echo "COVERAGE_OK=true" >> $GITHUB_ENV
           else
@@ -45,11 +50,10 @@ jobs:
         run: |
           curl -X POST https://shrutisharma40.app.n8n.cloud/webhook/vitest-coverage \
           -H "Content-Type: application/json" \
-          -d '{
-            "pr_number": "'"${{ github.event.pull_request.number }}"'",
-            "sha": "'"${{ github.sha }}"'",
-            "coverage_ok": '"${{ env.COVERAGE_OK }}"',
-            "under_tested": ${{ toJson(env.UNDER_TESTED) }}
-
-          }'
+          -d "$(jq -n \
+            --argjson pr_number "${{ github.event.pull_request.number }}" \
+            --arg sha "${{ github.sha }}" \
+            --arg coverage_ok "$COVERAGE_OK" \
+            --argjson under_tested "$UNDER_TESTED" \
+            '{pr_number: $pr_number, sha: $sha, coverage_ok: ($coverage_ok == "true"), under_tested: $under_tested}')"
 
