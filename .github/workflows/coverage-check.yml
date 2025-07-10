@@ -28,16 +28,13 @@ jobs:
         run: |
           COVERAGE_JSON="coverage/coverage-final.json"
 
-          # Get total line coverage
           TOTAL_COVERED=$(jq '.total.lines.pct' "$COVERAGE_JSON")
           echo "Total coverage: $TOTAL_COVERED"
 
           echo "COVERAGE=$TOTAL_COVERED" >> $GITHUB_ENV
 
-          # Identify under-covered files (<80%)
           jq 'to_entries | map(select(.value.lines.pct < 80)) | from_entries' "$COVERAGE_JSON" > under_tested.json
 
-          # Set coverage flag
           if (( $(echo "$TOTAL_COVERED >= 80" | bc -l) )); then
             echo "COVERAGE_OK=true" >> $GITHUB_ENV
           else
@@ -60,3 +57,9 @@ jobs:
               --arg coverage_ok "$COVERAGE_OK" \
               --argjson under_tested "$UNDER_TESTED" \
               '{pr_number: ($pr_number | tonumber), sha: $sha, coverage_ok: ($coverage_ok == "true"), under_tested: $under_tested}')"
+
+      - name: Fail if coverage is below threshold
+        if: env.COVERAGE_OK != 'true'
+        run: |
+          echo "❌ Test coverage is below 80%. Current: $COVERAGE%"
+          exit 1
