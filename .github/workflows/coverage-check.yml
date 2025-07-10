@@ -27,12 +27,14 @@ jobs:
         id: extract
         run: |
           COVERAGE_JSON="coverage/coverage-final.json"
-          
-          TOTAL_COVERED=$(jq '.total.lines.pct' "$COVERAGE_JSON")
+
+          # Dynamically compute total % coverage
+          TOTAL_COVERED=$(jq '[.[] | .lines.covered] | add as $c | [.[] | .lines.total] | add as $t | ($c / $t * 100)' "$COVERAGE_JSON")
           echo "Total coverage: $TOTAL_COVERED"
 
           echo "COVERAGE=$TOTAL_COVERED" >> $GITHUB_ENV
 
+          # Store under-tested file list
           jq 'to_entries | map(select(.value.lines.pct < 80)) | from_entries' "$COVERAGE_JSON" > under_tested.json
 
           if (( $(echo "$TOTAL_COVERED >= 80" | bc -l) )); then
@@ -41,7 +43,8 @@ jobs:
             echo "COVERAGE_OK=false" >> $GITHUB_ENV
           fi
 
-      - name: Post to n8n
+      - name: Post to n8n (even if failing)
+        if: always()
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           SHA: ${{ github.sha }}
@@ -50,8 +53,6 @@ jobs:
         run: |
           echo "Posting to n8n..."
           UNDER_TESTED=$(cat under_tested.json)
-
-          echo "UNDER_TESTED JSON: $UNDER_TESTED"
 
           curl -X POST https://shrutisharma40.app.n8n.cloud/webhook/vitest-coverage \
             -H "Content-Type: application/json" \
@@ -62,8 +63,9 @@ jobs:
               --argjson under_tested "$UNDER_TESTED" \
               '{pr_number: ($pr_number | tonumber), sha: $sha, coverage_ok: ($coverage_ok == "true"), under_tested: $under_tested}')"
 
-      - name: Fail if coverage is below threshold
+      - name: Fail if coverage < 80%
         if: env.COVERAGE_OK != 'true'
         run: |
           echo "❌ Test coverage is below 80%. Current: $COVERAGE%"
           exit 1
+
