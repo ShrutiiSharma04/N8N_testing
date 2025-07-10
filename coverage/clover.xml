@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1752122020874" clover="3.2.0">
-  <project timestamp="1752122020874" name="All files">
+<coverage generated="1752125623050" clover="3.2.0">
+  <project timestamp="1752125623050" name="All files">
     <metrics statements="98" coveredstatements="2" conditionals="4" coveredconditionals="0" methods="5" coveredmethods="0" elements="107" coveredelements="2" complexity="0" loc="98" ncloc="98" packages="1" files="5" classes="5"/>
     <file name="AccountSummary.jsx" path="C:\Users\Shruti Sharma\Downloads\Checking_issue\solid-app\src\AccountSummary.jsx">
       <metrics statements="20" coveredstatements="0" conditionals="1" coveredconditionals="0" methods="1" coveredmethods="0"/>
